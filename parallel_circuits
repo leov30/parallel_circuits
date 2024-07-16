@@ -1,0 +1,185 @@
+@echo off
+setlocal enabledelayedexpansion
+
+set /p "_n=Enter number of resistance in parallel: "&cls
+REM set /p "_v=Enter source volatage: "
+
+
+echo Enter Resistance:&echo:
+set /p "_rt=Total: "
+for /l %%g in (1,1,%_n%) do set /p "_r%%g=R%%g: "
+
+echo Enter Voltage:&echo:
+set /p "_vt=Total: "
+for /l %%g in (1,1,%_n%) do set /p "_v%%g=V%%g: "
+
+echo Enter Current ^(mA^):&echo:
+set /p "_it=Total: "
+for /f %%h in ('calc %_it%*0.001') do set _it=%%h
+for /l %%g in (1,1,%_n%) do (
+	set /p "_tmp=I%%g: "
+	for /f %%h in ('calc !_tmp!*0.001') do set _i%%g=%%h
+)
+
+echo Enter Power ^(mW^):&echo:
+set /p "_pt=Total: "
+for /f %%h in ('calc %_pt%*0.001') do set _pt=%%h
+for /l %%g in (1,1,%_n%) do (
+	set /p "_tmp=P%%g: "
+	for /f %%h in ('calc !_tmp!*0.001') do set _p%%g=%%h
+	
+)
+
+rem //order matters depends on the problem
+call :get_p
+call :get_v
+call :get_r
+call :get_i
+
+call :get_v
+call :get_r
+call :get_i
+call :get_p
+
+
+for /f %%h in ('calc !_it!*1000') do set _it=%%h
+for /f %%h in ('calc !_pt!*1000') do set _pt=%%h
+
+(echo ;Ohms;Volts;mAmps;mWatts)>output.csv 
+
+for /l %%g in (1,1,%_n%) do (
+	for /f %%h in ('calc !_i%%g!*1000') do set _i%%g=%%h
+	for /f %%h in ('calc !_p%%g!*1000') do set _p%%g=%%h
+	
+	(echo R%%g;!_r%%g!;!_v%%g!;!_i%%g!;!_p%%g!)>>output.csv
+
+)
+
+(echo Total;%_rt%;%_vt%;%_it%;%_pt%) >>output.csv 
+
+pause&exit
+rem // ------------------------- end  of script --------------------------------------------
+
+
+:get_i
+
+for /l %%g in (1,1,%_n%) do (
+	if !_i%%g! equ 0 (
+		if !_v%%g! neq 0 if !_r%%g! neq 0 for /f %%h in ('calc !_v%%g!/!_r%%g!') do set _i%%g=%%h
+		if !_p%%g! neq 0 if !_v%%g! neq 0 for /f %%h in ('calc !_p%%g!/!_v%%g!') do set _i%%g=%%h
+		if !_p%%g! neq 0 if !_r%%g! neq 0 for /f %%h in ('calc sqrt^(!_p%%g!/!_r%%g!^)') do set _i%%g=%%h
+	)
+)
+
+rem //total
+if !_it! equ 0 (
+	if !_vt! neq 0 if !_rt! neq 0 for /f %%h in ('calc !_vt!/!_rt!') do set _it=%%h
+	if !_pt! neq 0 if !_vt! neq 0 for /f %%h in ('calc !_pt!/!_vt!') do set _it=%%h
+	if !_pt! neq 0 if !_rt! neq 0 for /f %%h in ('calc sqrt^(!_pt!/!_rt!^)') do set _it=%%h
+)else (
+	exit /b
+)
+
+rem //test for unkonws
+for /l %%g in (1,1,%_n%) do if !_i%%g! equ 0 exit /b
+
+if !_it! equ 0 (
+	for /l %%g in (1,1,%_n%) do (		
+			for /f %%h in ('calc !_i%%g!+!_it!') do set _it=%%h
+	)
+)
+
+
+exit /b
+
+:get_p
+
+for /l %%g in (1,1,%_n%) do (
+	if !_p%%g! equ 0 (
+		if !_v%%g! neq 0 if !_i%%g! neq 0 for /f %%h in ('calc !_v%%g!*!_i%%g!') do set _p%%g=%%h
+		if !_i%%g! neq 0 if !_r%%g! neq 0 for /f %%h in ('calc !_i%%g!*!_i%%g!*!_r%%g!') do set _p%%g=%%h
+		if !_v%%g! neq 0 if !_r%%g! neq 0 for /f %%h in ('calc !_v%%g!*!_v%%g!/!_r%%g!') do set _p%%g=%%h
+	)
+)
+
+rem //total
+if !_pt! equ 0 (
+	if !_vt! neq 0 if !_it! neq 0 for /f %%h in ('calc !_vt!*!_it!') do set _pt=%%h
+	if !_it! neq 0 if !_rt! neq 0 for /f %%h in ('calc !_it!*!_it!*!_rt!') do set _pt=%%h
+	if !_vt! neq 0 if !_rt! neq 0 for /f %%h in ('calc !_vt!*!_vt!/!_rt!') do set _pt=%%h
+)else (
+	exit /b
+)
+
+
+rem //test for unkonws
+for /l %%g in (1,1,%_n%) do if !_p%%g! equ 0 exit /b
+
+if !_pt! equ 0 (
+	for /l %%g in (1,1,%_n%) do (		
+			for /f %%h in ('calc !_p%%g!+!_pt!') do set _pt=%%h
+	)
+)
+
+exit /b
+
+:get_r
+rem //calculate unknown resistance
+for /l %%g in (1,1,%_n%) do (
+	if !_r%%g! equ 0 (
+		
+		if !_v%%g! neq 0 if !_i%%g! neq 0 for /f %%h in ('calc !_v%%g!/!_i%%g!') do set _r%%g=%%h
+		if !_v%%g! neq 0 if !_p%%g! neq 0 for /f %%h in ('calc !_v%%g!*!_v%%g!/!_p%%g!') do set _r%%g=%%h
+		if !_p%%g! neq 0 if !_i%%g! neq 0 for /f %%h in ('calc !_p%%g!/^(!_i%%g!*!_i%%g!^)') do set _r%%g=%%h	
+	)
+)
+
+rem //total
+if !_rt! equ 0 (
+	if !_vt! neq 0 if !_it! neq 0 for /f %%h in ('calc !_vt!/!_it!') do set _rt=%%h
+	if !_vt! neq 0 if !_pt! neq 0 for /f %%h in ('calc !_vt!*!_vt!/!_pt!') do set _rt=%%h
+	if !_pt! neq 0 if !_it! neq 0 for /f %%h in ('calc !_pt!/^(!_it!*!_it!^)') do set _rt=%%h	
+)else (
+	exit /b
+)
+
+
+rem //test for unkonws
+for /l %%g in (1,1,%_n%) do if !_r%%g! equ 0 exit /b
+
+set _tmp=0
+if !_rt! equ 0 (
+	for /l %%g in (1,1,%_n%) do (		
+			for /f %%h in ('calc 1/!_r%%g!+!_tmp!') do set _tmp=%%h
+	)
+	for /f %%h in ('calc 1/!_tmp!') do set _rt=%%h
+)
+
+exit /b
+
+:get_v
+
+for /l %%g in (1,1,%_n%) do (
+	if !_v%%g! equ 0 (
+		if !_r%%g! neq 0 if !_i%%g! neq 0 for /f %%h in ('calc !_r%%g!*!_i%%g!') do set _v%%g=%%h
+		if !_p%%g! neq 0 if !_i%%g! neq 0 for /f %%h in ('calc !_p%%g!/!_i%%g!') do set _v%%g=%%h
+		if !_p%%g! neq 0 if !_r%%g! neq 0 for /f %%h in ('calc sqrt^(!_p%%g!*!_r%%g!^)') do set _v%%g=%%h
+	)
+)
+
+if %_vt% equ 0 (
+	for /l %%g in (1,1,%_n%) do if !_v%%g! neq 0 set _vt=!_v%%g!
+)
+
+if %_vt% equ 0 (
+	if %_rt% neq 0 if %_it% neq 0 for /f %%h in ('calc %_rt%*%_it%') do set _vt=%%h
+	if %_pt% neq 0 if %_it% neq 0 for /f %%h in ('calc %_pt%/%_it%') do set _vt=%%h
+	if %_pt% neq 0 if %_rt% neq 0 for /f %%h in ('calc sqrt^(!_pt!*!_rt!^)') do set _vt=%%h
+)
+
+rem //fill in table
+if %_vt% neq 0 (
+	for /l %%g in (1,1,%_n%) do set _v%%g=%_vt%
+)
+
+exit /b
