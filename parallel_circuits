@@ -1,47 +1,83 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set /p "_n=Enter number of resistance in parallel: "&cls
-REM set /p "_v=Enter source volatage: "
+if not exist calc.exe title ERROR&echo This script requires calc.exe ^(https://cmdlinecalc.sourceforge.io/^) to work&pause&exit
 
+title Simple Batch DC cirucit solver by leov30
+:go_back
+cls
+echo Select DC circuit to solve
+echo ------------------------------
+echo:
+echo 1. Parallel
+echo 2. Series
+echo:
+set /p _opt="Enter Option: "
 
-echo Enter Resistance:&echo:
-set /p "_rt=Total: "
-for /l %%g in (1,1,%_n%) do set /p "_r%%g=R%%g: "
+if "%_opt%"=="1" (set _opt=parallel
+)else if "%_opt%"=="2" (set _opt=serie
+)else goto :go_back
 
-echo Enter Voltage:&echo:
-set /p "_vt=Total: "
-for /l %%g in (1,1,%_n%) do set /p "_v%%g=V%%g: "
+echo:
+set /p "_n=How many resistance are in %_opt%?: " || goto :go_back
+if "%_n%"=="0" goto :go_back
 
-echo Enter Current ^(mA^):&echo:
-set /p "_it=Total: "
+cls
+echo:&echo Enter Resistance ^(Ohms^)
+echo ---------------------
+set /p "_rt=Total: " || set _rt=0
+for /l %%g in (1,1,%_n%) do set /p "_r%%g=R%%g: " || set _r%%g=0
+
+echo:&echo Enter Voltage ^(Volts^)
+echo ---------------------
+set /p "_vt=Total: " || set _vt=0
+for /l %%g in (1,1,%_n%) do set /p "_v%%g=V%%g: " || set _v%%g=0
+
+echo:&echo Enter Current ^(milli-Aamp^)
+echo ---------------------
+set /p "_it=Total: " || set _it=0
 for /f %%h in ('calc %_it%*0.001') do set _it=%%h
+
 for /l %%g in (1,1,%_n%) do (
-	set /p "_tmp=I%%g: "
+	set /p "_tmp=I%%g: " || set _tmp=0
 	for /f %%h in ('calc !_tmp!*0.001') do set _i%%g=%%h
 )
 
-echo Enter Power ^(mW^):&echo:
-set /p "_pt=Total: "
+echo:&echo Enter Power ^(milli-Watts^)
+echo ---------------------
+set /p "_pt=Total: " || set _pt=0
 for /f %%h in ('calc %_pt%*0.001') do set _pt=%%h
+
 for /l %%g in (1,1,%_n%) do (
-	set /p "_tmp=P%%g: "
+	set /p "_tmp=P%%g: " || set _tmp=0
 	for /f %%h in ('calc !_tmp!*0.001') do set _p%%g=%%h
 	
 )
 
+
+
 rem //order matters depends on the problem
-call :get_p
-call :get_v
-call :get_r
-call :get_i
-
-call :get_v
-call :get_r
-call :get_i
-call :get_p
 
 
+:loop
+cls
+
+set _y=0
+for /l %%g in (1,1,%_n%) do if !_r%%g! equ 0 call :get_r & set /a _y+=1
+for /l %%g in (1,1,%_n%) do if !_i%%g! equ 0 call :get_i & set /a _y+=1
+
+for /l %%g in (1,1,%_n%) do if !_v%%g! equ 0 call :get_v & set /a _y+=1
+for /l %%g in (1,1,%_n%) do if !_p%%g! equ 0 call :get_p & set /a _y+=1
+
+
+if !_rt! equ 0 call :get_r & set /a _y+=1
+if !_it! equ 0 call :get_i & set /a _y+=1
+if !_vt! equ 0 call :get_v & set /a _y+=1
+if !_pt! equ 0 call :get_p & set /a _y+=1
+
+if %_y% neq 0 goto :loop
+
+cls
 for /f %%h in ('calc !_it!*1000') do set _it=%%h
 for /f %%h in ('calc !_pt!*1000') do set _pt=%%h
 
@@ -53,11 +89,21 @@ for /l %%g in (1,1,%_n%) do (
 	
 	(echo R%%g;!_r%%g!;!_v%%g!;!_i%%g!;!_p%%g!)>>output.csv
 
+
 )
 
-(echo Total;%_rt%;%_vt%;%_it%;%_pt%) >>output.csv 
+echo       	Ohms	^|	Volts	^|	mAmps	^|	mWatts
+echo       	-------------------------------------------------------------------------------
+for /l %%g in (1,1,%_n%) do echo Re__%%g:	!_r%%g!	^|	!_v%%g!	^|	!_i%%g!	^|	!_p%%g!
+echo Total:	!_rt!	^|	!_vt!	^|	!_it!	^|	!_pt!
 
-pause&exit
+(echo Total;%_rt%;%_vt%;%_it%;%_pt%) >>output.csv
+
+echo:
+choice /m "Do another one?: " /c:yn
+if %errorlevel% equ 1 goto :go_back
+
+exit
 rem // ------------------------- end  of script --------------------------------------------
 
 
@@ -80,15 +126,44 @@ if !_it! equ 0 (
 	exit /b
 )
 
-rem //test for unkonws
-for /l %%g in (1,1,%_n%) do if !_i%%g! equ 0 exit /b
+rem //if i total still not known in series, get it from any resistance
+if %_opt%==serie if !_it! equ 0 for /l %%g in (1,1,%_n%) do if !_i%%g! neq 0 set _it=!_i%%g!
 
-if !_it! equ 0 (
-	for /l %%g in (1,1,%_n%) do (		
-			for /f %%h in ('calc !_i%%g!+!_it!') do set _it=%%h
-	)
+
+rem //fill in table for series for a known i total
+if %_opt%==serie if !_it! neq 0 for /l %%g in (1,1,%_n%) do set _i%%g=%_it%
+
+
+
+rem //test for unkonws, use voltage divider for series
+set _x=0&set _index=0
+for /l %%g in (1,1,%_n%) do if !_i%%g! equ 0 (
+	set /a _x+=1
+	set _index=%%g
 )
 
+
+rem //fine one missing current value in parallel
+set _sum=0
+if %_opt%==parallel if %_it% neq 0 if %_rt% neq 0 if %_x% equ 1 if !_r%_index%! neq 0 (
+	for /l %%g in (1,1,%_n%) do for /f %%h in ('calc !_it!*!_rt!/!_r%_index%!') do set _i!_index!=%%h
+	set _x=0
+)
+
+rem //fine one missing current  value in parallel
+set _sum=0
+if %_opt%==parallel if %_it% neq 0 if %_x% equ 1 (
+	for /l %%g in (1,1,%_n%) do for /f %%h in ('calc !_i%%g!+!_sum!') do set _sum=%%h
+	for /f %%g in ('calc !_it!-!_sum!') do set _i!_index!=%%g
+	set _x=0
+)
+
+
+rem // for total current not known in parallel, add all branches currrents
+if %_opt%==parallel if !_it! equ 0 if !_x! equ 0 (
+	for /l %%g in (1,1,%_n%) do for /f %%h in ('calc !_i%%g!+!_it!') do set _it=%%h
+
+)
 
 exit /b
 
@@ -111,10 +186,12 @@ if !_pt! equ 0 (
 	exit /b
 )
 
+rem // WIP find one missng power values *************
 
 rem //test for unkonws
 for /l %%g in (1,1,%_n%) do if !_p%%g! equ 0 exit /b
 
+rem //sum all powers
 if !_pt! equ 0 (
 	for /l %%g in (1,1,%_n%) do (		
 			for /f %%h in ('calc !_p%%g!+!_pt!') do set _pt=%%h
@@ -124,7 +201,9 @@ if !_pt! equ 0 (
 exit /b
 
 :get_r
+
 rem //calculate unknown resistance
+
 for /l %%g in (1,1,%_n%) do (
 	if !_r%%g! equ 0 (
 		
@@ -143,16 +222,47 @@ if !_rt! equ 0 (
 	exit /b
 )
 
-
 rem //test for unkonws
-for /l %%g in (1,1,%_n%) do if !_r%%g! equ 0 exit /b
-
-set _tmp=0
-if !_rt! equ 0 (
-	for /l %%g in (1,1,%_n%) do (		
-			for /f %%h in ('calc 1/!_r%%g!+!_tmp!') do set _tmp=%%h
+set _x=0&set _index=0
+for /l %%g in (1,1,%_n%) do (
+	if !_r%%g! equ 0 (
+		set /a _x+=1
+		set _index=%%g
 	)
-	for /f %%h in ('calc 1/!_tmp!') do set _rt=%%h
+)
+
+
+rem //******** WIP find one missing resistance in parallel
+
+rem // find one missing resistance in series if rt its known
+set _sum=0
+if %_opt%==serie if %_x% equ 1 if %_rt% neq 0 (
+	for /l %%g in (1,1,%_n%) do for /f %%h in ('calc !_r%%g!+!_sum!') do set _sum=%%h
+	for /f %%g in ('calc !_rt!-!_sum!') do set _r!_index!=%%g
+	set _x=0
+)
+
+rem //total resistance already known
+if !_rt! neq 0 exit /b
+if %_x% neq 0 exit /b
+
+rem //total resistance when all values are known
+
+rem //series
+if %_opt%==serie (
+	for /l %%g in (1,1,%_n%) do (		
+			for /f %%h in ('calc !_r%%g!+!_rt!') do set _rt=%%h
+	)
+)
+
+
+rem //parallel
+set _sum=0
+if %_opt%==parallel (
+	for /l %%g in (1,1,%_n%) do (		
+			for /f %%h in ('calc 1/!_r%%g!+!_sum!') do set _sum=%%h
+	)
+	for /f %%h in ('calc 1/!_sum!') do set _rt=%%h
 )
 
 exit /b
@@ -168,18 +278,47 @@ for /l %%g in (1,1,%_n%) do (
 )
 
 if %_vt% equ 0 (
-	for /l %%g in (1,1,%_n%) do if !_v%%g! neq 0 set _vt=!_v%%g!
-)
-
-if %_vt% equ 0 (
 	if %_rt% neq 0 if %_it% neq 0 for /f %%h in ('calc %_rt%*%_it%') do set _vt=%%h
 	if %_pt% neq 0 if %_it% neq 0 for /f %%h in ('calc %_pt%/%_it%') do set _vt=%%h
 	if %_pt% neq 0 if %_rt% neq 0 for /f %%h in ('calc sqrt^(!_pt!*!_rt!^)') do set _vt=%%h
 )
 
-rem //fill in table
-if %_vt% neq 0 (
-	for /l %%g in (1,1,%_n%) do set _v%%g=%_vt%
+rem //get total voltage from any known voltage, in parallel
+if %_opt%==parallel if %_vt% equ 0 for /l %%g in (1,1,%_n%) do if !_v%%g! neq 0 set _vt=!_v%%g!
+
+rem //fill in table for parallel for a known total voltage
+if %_opt%==parallel if %_vt% neq 0 for /l %%g in (1,1,%_n%) do set _v%%g=%_vt%
+
+
+
+rem //test for unkonws, use voltage divider for series
+set _x=0&set _index=0
+for /l %%g in (1,1,%_n%) do if !_v%%g! equ 0 (
+	set /a _x+=1
+	set _index=%%g
 )
 
+rem // for vt not known in series, add all voltages
+if %_opt%==serie if !_vt! equ 0 if %_x% equ 0 (
+	for /l %%g in (1,1,%_n%) do for /f %%h in ('calc !_v%%g!+!_vt!') do set _vt=%%h
+
+)
+
+rem //fine one missing voltage value in series
+set _sum=0
+if %_opt%==serie if %_vt% neq 0 if %_rt% neq 0 if %_x% equ 1 if !_r%_index%! neq 0 (
+	for /l %%g in (1,1,%_n%) do for /f %%h in ('calc !_vt!*!_r%_index%!/!_rt!') do set _v!_index!=%%h
+	set _x=0
+)
+
+rem //fine one missing voltage value in series
+set _sum=0
+if %_opt%==serie if %_vt% neq 0 if %_x% equ 1 (
+	for /l %%g in (1,1,%_n%) do for /f %%h in ('calc !_v%%g!+!_sum!') do set _sum=%%h
+	for /f %%g in ('calc !_vt!-!_sum!') do set _v!_index!=%%g
+	set _x=0
+)
+
+
 exit /b
+
