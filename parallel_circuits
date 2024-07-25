@@ -3,9 +3,10 @@ setlocal enabledelayedexpansion
 
 if not exist calc.exe title ERROR&echo This script requires calc.exe ^(https://cmdlinecalc.sourceforge.io/^) to work&pause&exit
 
-title Simple Batch DC cirucit solver by leov30
+
 :go_back
 cls
+title Simple Batch DC cirucit solver by leov30
 echo Select DC circuit to solve
 echo ------------------------------
 echo:
@@ -21,46 +22,76 @@ if "%_opt%"=="1" (set _opt=parallel
 echo:
 set /p "_n=How many resistance are in %_opt%?: " || goto :go_back
 if "%_n%"=="0" goto :go_back
+cls
+
+rem // *********** alternative input 1 *********************
+rem // user will need to un-comment the lines depending on the input method to use
+
+
+echo Enter Total ^(Source^)&echo ----------------------
+set /p "_rt=R (Ohms): " || set _rt=0
+set /p "_vt=V (V): " || set _vt=0
+
+set /p "_tmp=I (mA): " || set _tmp=0
+for /f %%h in ('calc !_tmp!*0.001') do set _it=%%h
+
+set /p "_tmp=P (mW): " || set _tmp=0
+for /f %%h in ('calc !_tmp!*0.001') do set _pt=%%h
 
 cls
-echo:&echo Enter Resistance ^(Ohms^)
-echo ---------------------
-set /p "_rt=Total: " || set _rt=0
-for /l %%g in (1,1,%_n%) do set /p "_r%%g=R%%g: " || set _r%%g=0
-
-echo:&echo Enter Voltage ^(Volts^)
-echo ---------------------
-set /p "_vt=Total: " || set _vt=0
-for /l %%g in (1,1,%_n%) do set /p "_v%%g=V%%g: " || set _v%%g=0
-
-echo:&echo Enter Current ^(milli-Aamp^)
-echo ---------------------
-set /p "_it=Total: " || set _it=0
-for /f %%h in ('calc %_it%*0.001') do set _it=%%h
-
 for /l %%g in (1,1,%_n%) do (
-	set /p "_tmp=I%%g: " || set _tmp=0
-	for /f %%h in ('calc !_tmp!*0.001') do set _i%%g=%%h
-)
-
-echo:&echo Enter Power ^(milli-Watts^)
-echo ---------------------
-set /p "_pt=Total: " || set _pt=0
-for /f %%h in ('calc %_pt%*0.001') do set _pt=%%h
-
-for /l %%g in (1,1,%_n%) do (
-	set /p "_tmp=P%%g: " || set _tmp=0
-	for /f %%h in ('calc !_tmp!*0.001') do set _p%%g=%%h
+	echo:&echo #%%g Resistance&echo ----------------------
+	set /p "_r%%g=R (Ohms): " || set _r%%g=0
+	set /p "_v%%g=V (V): " || set _v%%g=0
 	
+	set /p "_tmp=I (mA): " || set _tmp=0
+	for /f %%h in ('calc !_tmp!*0.001') do set _i%%g=%%h
+	
+	set /p "_tmp=P (W): " || set _tmp=0
+	for /f %%h in ('calc !_tmp!*0.001') do set _p%%g=%%h
 )
 
 
+rem // *********** alternative input method 2 **********************
 
-rem //order matters depends on the problem
+REM echo:&echo Enter Resistance ^(Ohms^)
+REM echo ---------------------
+REM set /p "_rt=Total: " || set _rt=0
+REM for /l %%g in (1,1,%_n%) do set /p "_r%%g=R%%g: " || set _r%%g=0
+
+REM echo:&echo Enter Voltage ^(Volts^)
+REM echo ---------------------
+REM set /p "_vt=Total: " || set _vt=0
+REM for /l %%g in (1,1,%_n%) do set /p "_v%%g=V%%g: " || set _v%%g=0
+
+REM echo:&echo Enter Current ^(milli-Amp^)
+REM echo ---------------------
+REM set /p "_it=Total: " || set _it=0
+REM for /f %%h in ('calc %_it%*0.001') do set _it=%%h
+
+REM for /l %%g in (1,1,%_n%) do (
+	REM set /p "_tmp=I%%g: " || set _tmp=0
+	REM for /f %%h in ('calc !_tmp!*0.001') do set _i%%g=%%h
+REM )
+
+REM echo:&echo Enter Power ^(milli-Watts^)
+REM echo ---------------------
+REM set /p "_pt=Total: " || set _pt=0
+REM for /f %%h in ('calc %_pt%*0.001') do set _pt=%%h
+
+REM for /l %%g in (1,1,%_n%) do (
+	REM set /p "_tmp=P%%g: " || set _tmp=0
+	REM for /f %%h in ('calc !_tmp!*0.001') do set _p%%g=%%h
+	
+REM )
 
 
+
+
+set _loop=0
 :loop
 cls
+rem //order matters depends on the problem
 
 set _y=0
 for /l %%g in (1,1,%_n%) do if !_r%%g! equ 0 call :get_r & set /a _y+=1
@@ -75,6 +106,9 @@ if !_it! equ 0 call :get_i & set /a _y+=1
 if !_vt! equ 0 call :get_v & set /a _y+=1
 if !_pt! equ 0 call :get_p & set /a _y+=1
 
+set /a _loop+=1
+
+if !_loop! geq 5 title ERROR&echo Cant find a solution&pause&goto :go_back
 if %_y% neq 0 goto :loop
 
 cls
@@ -94,43 +128,79 @@ for /l %%g in (1,1,%_n%) do (
 
 (echo Total;%_rt%;%_vt%;%_it%;%_pt%) >>output.csv
 
-echo       	Ohms	^|	Volts	^|	mAmps	^|	mWatts
-echo       	-------------------------------------------------------------------------------
-for /l %%g in (1,1,%_n%) do echo Re__%%g:	!_r%%g!	^|	!_v%%g!	^|	!_i%%g!	^|	!_p%%g!
-echo       	-------------------------------------------------------------------------------
-echo Total:	!_rt!	^|	!_vt!	^|	!_it!	^|	!_pt!
-echo:
+call :option_view 3
 
+:menu_view
 call :check_error
 echo:
-choice /m "Display alternative view: " /c:yn
-if %errorlevel% equ 1 (
-	cls
-	echo Resistance&echo -----------------
-	for /l %%g in (1,1,%_n%) do echo R_%%g: !_r%%g! Ohms
-	echo R_t: !_rt! Ohms&echo:
-
-	echo Voltage&echo -----------------
-	for /l %%g in (1,1,%_n%) do echo V_%%g: !_v%%g! V
-	echo V_t: !_vt! V&echo:
-
-	echo Current&echo -----------------
-	for /l %%g in (1,1,%_n%) do echo I_%%g: !_i%%g! mA
-	echo I_t: !_it! mA&echo:
-
-	echo Power&echo -----------------
-	for /l %%g in (1,1,%_n%) do echo P_%%g: !_p%%g! mW
-	echo P_t: !_pt! mW&echo:
-	call :check_error
-)
-
-
+echo ==========================
 echo:
-choice /m "Do another one?: " /c:yn
+echo 1. Do another one
+echo 2. Table view
+echo 3. List view
+echo 4. List view alt
+echo 5. Exit
+echo:
+choice /m "Select Option: " /c:12345
 if %errorlevel% equ 1 goto :go_back
+if %errorlevel% equ 2 call :option_view 1&goto :menu_view
+if %errorlevel% equ 3 call :option_view 2&goto :menu_view
+if %errorlevel% equ 4 call :option_view 3&goto :menu_view
 
 exit
 rem // ------------------------- end  of script --------------------------------------------
+
+:option_view
+cls
+
+if %1 equ 1 (
+	echo       	Ohms	^|	Volts	^|	mAmps	^|	mWatts
+	echo       	-------------------------------------------------------------------------------
+	for /l %%g in (1,1,%_n%) do echo Re__%%g:	!_r%%g!	^|	!_v%%g!	^|	!_i%%g!	^|	!_p%%g!
+	echo       	-------------------------------------------------------------------------------
+	echo Total:	!_rt!	^|	!_vt!	^|	!_it!	^|	!_pt!
+)
+
+
+
+if %1 equ 2 (
+	echo:&echo Resistance&echo -----------------
+	for /l %%g in (1,1,%_n%) do echo R_%%g: !_r%%g! Ohms
+	echo Total: !_rt! Ohms&echo:
+	
+	echo:&echo Voltage&echo -----------------
+	for /l %%g in (1,1,%_n%) do echo V_%%g: !_v%%g! V
+	echo Total: !_vt! V&echo:
+
+	echo:&echo Current&echo -----------------
+	for /l %%g in (1,1,%_n%) do echo I_%%g: !_i%%g! mA
+	echo Total: !_it! mA&echo:
+
+	echo:&echo Power&echo -----------------
+	for /l %%g in (1,1,%_n%) do echo P_%%g: !_p%%g! mW
+	echo Total: !_pt! mW&echo:
+	
+)
+
+if %1 equ 3 (
+	echo:&echo Totals:&echo ------------------
+	echo !_rt! Ohms
+	echo !_vt! V
+	echo !_it! mA
+	echo !_pt! mW
+
+	for /l %%g in (1,1,%_n%) do (
+		echo:&echo Re_%%g:&echo ------------------
+		echo !_r%%g! Ohms
+		echo !_v%%g! V
+		echo !_i%%g! mA
+		echo !_p%%g! mW
+	)
+
+)
+
+exit /b
+
 
 
 :check_error
@@ -388,5 +458,6 @@ if %_opt%==serie if %_vt% neq 0 if %_x% equ 1 (
 
 
 exit /b
+
 
 
