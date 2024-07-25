@@ -92,12 +92,38 @@ for /l %%g in (1,1,%_n%) do (
 
 )
 
+(echo Total;%_rt%;%_vt%;%_it%;%_pt%) >>output.csv
+
 echo       	Ohms	^|	Volts	^|	mAmps	^|	mWatts
 echo       	-------------------------------------------------------------------------------
 for /l %%g in (1,1,%_n%) do echo Re__%%g:	!_r%%g!	^|	!_v%%g!	^|	!_i%%g!	^|	!_p%%g!
+echo       	-------------------------------------------------------------------------------
 echo Total:	!_rt!	^|	!_vt!	^|	!_it!	^|	!_pt!
+echo:
 
-(echo Total;%_rt%;%_vt%;%_it%;%_pt%) >>output.csv
+call :check_error
+echo:
+choice /m "Display alternative view: " /c:yn
+if %errorlevel% equ 1 (
+	cls
+	echo Resistance&echo -----------------
+	for /l %%g in (1,1,%_n%) do echo R_%%g: !_r%%g! Ohms
+	echo R_t: !_rt! Ohms&echo:
+
+	echo Voltage&echo -----------------
+	for /l %%g in (1,1,%_n%) do echo V_%%g: !_v%%g! V
+	echo V_t: !_vt! V&echo:
+
+	echo Current&echo -----------------
+	for /l %%g in (1,1,%_n%) do echo I_%%g: !_i%%g! mA
+	echo I_t: !_it! mA&echo:
+
+	echo Power&echo -----------------
+	for /l %%g in (1,1,%_n%) do echo P_%%g: !_p%%g! mW
+	echo P_t: !_pt! mW&echo:
+	call :check_error
+)
+
 
 echo:
 choice /m "Do another one?: " /c:yn
@@ -107,7 +133,45 @@ exit
 rem // ------------------------- end  of script --------------------------------------------
 
 
+:check_error
+echo:
+rem //power sum
+set _sum=0
+for /l %%g in (1,1,%_n%) do for /f %%h in ('calc !_p%%g!+!_sum!') do set _sum=%%h
+if not "!_pt!"=="!_sum!" echo ERROR: Total power and sum dind't match: !_pt! = !_sum!
+
+if %_opt%==serie (
+	rem //voltage sum
+	set _sum=0
+	for /l %%g in (1,1,%_n%) do for /f %%h in ('calc !_v%%g!+!_sum!') do set _sum=%%h
+	if not "!_vt!"=="!_sum!" echo ERROR: Total voltage and sum dind't match: !_vt! = !_sum!
+	
+	for /l %%g in (1,1,%_n%) do if not "!_i%%g!"=="!_it!" echo ERROR: Total current didn't match: !_i%%g! = !_it!
+
+)
+
+
+if %_opt%==parallel (
+	rem //current sum
+	set _sum=0
+	for /l %%g in (1,1,%_n%) do for /f %%h in ('calc !_i%%g!+!_sum!') do set _sum=%%h
+	if not "!_it!"=="!_sum!" echo ERROR: Total current and sum dind't match: !_it! = !_sum!
+	
+	for /l %%g in (1,1,%_n%) do if not "!_v%%g!"=="!_vt!" echo ERROR: Total voltage didn't match: !_v%%g! = !_vt!
+
+)
+
+
+
+
+
+
+
+exit /b
+
 :get_i
+
+rem //all current should be the same in series, wont check for miss match
 
 for /l %%g in (1,1,%_n%) do (
 	if !_i%%g! equ 0 (
@@ -168,6 +232,7 @@ if %_opt%==parallel if !_it! equ 0 if !_x! equ 0 (
 exit /b
 
 :get_p
+
 
 for /l %%g in (1,1,%_n%) do (
 	if !_p%%g! equ 0 (
@@ -269,6 +334,8 @@ exit /b
 
 :get_v
 
+rem //all voltages should be the same in parallel, wont check for missmatch
+
 for /l %%g in (1,1,%_n%) do (
 	if !_v%%g! equ 0 (
 		if !_r%%g! neq 0 if !_i%%g! neq 0 for /f %%h in ('calc !_r%%g!*!_i%%g!') do set _v%%g=%%h
@@ -321,4 +388,5 @@ if %_opt%==serie if %_vt% neq 0 if %_x% equ 1 (
 
 
 exit /b
+
 
